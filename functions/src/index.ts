@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as puppeteer from 'puppeteer';
+import * as moment from 'moment';
 const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
@@ -20,6 +21,7 @@ async function scrape() {
       });
 
     return {
+      date: moment().format('DD/MM/YYYY'),
       belgium: (totalCasesCollection[0].children[1] as HTMLElement).innerText,
       world: (totalCasesCollection[1].children[1] as HTMLElement).innerText
     }
@@ -30,6 +32,15 @@ async function scrape() {
 
 export const scheduledScraping = functions.pubsub.schedule('every 12 hours').onRun(async () => {
   const cases = await scrape();
-  const docRef = db.collection('covid-scrapes').doc();
-  await docRef.set(cases);
+  try {
+    const docRef = db.collection('covid-scrapes').doc();
+    await docRef.set(cases);
+    functions.logger.log('Saved latest covid scrape');
+    functions.logger.log('------');
+    functions.logger.log(cases);
+  } catch (error) {
+    functions.logger.error(`Scraped data wasn't a valid object`);
+    functions.logger.log('------');
+    functions.logger.error(cases);
+  }
 });
